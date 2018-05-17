@@ -69,7 +69,7 @@ def get_ROW_offset(coordinates, offset):
 
 
 if __name__ == '__main__':
-    with open('sample.kml') as kml:
+    with open('./data/sample.kml') as kml:
         root = parser.parse(kml).getroot()
 
     RC6700, raw_RC6700 = get_coordinate('MainPipeline', 'RC6700', root)
@@ -135,7 +135,7 @@ if __name__ == '__main__':
         id='002'
     )
 
-    with open('RC6700_ICS.kml', 'w') as f:
+    with open('./processed_data/RC6700_ICS.kml', 'w') as f:
         doc = KML.kml(
             KML.Document(
                 KML.name('ICS Modified'),
