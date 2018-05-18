@@ -26,12 +26,20 @@ def get_node(node_name, child_name, root):
 
 
 def get_coordinate(folder_name, placemark_name, root):
+    """
+        folder_name = access to folder.name in root
+        placemark_name = interested placemark in root
+        root = kml document start at root node
+    """
     folder = get_node('Folder', folder_name, root)
-    print(folder.name)
     
     placemark = get_node('Placemark', placemark_name, folder)
     raw_coor = placemark.MultiGeometry.LineString.coordinates.text
     coor_placemark = raw_coor.split(' ')
+
+    print('Current Folder:', folder.name)
+    print('Current Placemark:', placemark.name)
+
     return coor_placemark, raw_coor
 
 
@@ -64,6 +72,54 @@ def get_ROW_offset(coordinates, offset):
     ROW_R = np.array(ROW_R).astype(np.str)
 
     return to_ROW_string(ROW_L), to_ROW_string(ROW_R)
+
+
+def placemark_generator(placemark_id, placemark_name, line_color, line_width, coordinates):
+    """
+        All parameter should be a string, except coordinates is a list of strings
+    """
+    if placemark_name == 'main':
+        multi_geometry = KML.MultiGeometry(KML.LineString(KML.coordinates(coordinates)))
+    else:
+        multi_geometry = KML.MultiGeometry(
+            KML.LineString(KML.coordinates(coordinates[0])),
+            KML.LineString(KML.coordinates(coordinates[1]))
+        )
+
+    placemark = KML.Placemark(
+        KML.name(placemark_name),
+        KML.Style(
+            KML.LineStyle(
+                KML.color(line_color),
+                KML.width(line_width)
+            )
+        ),
+        KML.extrude(0),
+        multi_geometry,
+        id=placemark_id
+    )
+
+    return placemark
+
+
+
+def route_folder_generator(root, placemark_name, ROW_offset, buffer_offset):
+    route, raw_route = get_coordinate('MainPipeline', placemark_name, root)
+    ROW_L, ROW_R = get_ROW_offset(route, ROW_offset)
+    buffer_L, buffer_R = get_ROW_offset(route, buffer_offset)
+    pm_main = placemark_generator('000', 'main', GREEN, 4, raw_route)
+    pm_ROW = placemark_generator('001', 'ROW', BLUE, 4, [ROW_L, ROW_R])
+    pm_buffer = placemark_generator('002', 'buffer', RED, 4, [buffer_L, buffer_R])
+    folder_kml = KML.Folder(
+        KML.name(placemark_name),
+        pm_main,
+        pm_ROW,
+        pm_buffer 
+    )
+
+    return folder_kml
+
+
         
 
 
@@ -72,79 +128,22 @@ if __name__ == '__main__':
     with open('./data/sample.kml') as kml:
         root = parser.parse(kml).getroot()
 
-    RC6700, raw_RC6700 = get_coordinate('MainPipeline', 'RC6700', root)
-    ROW_L, ROW_R = get_ROW_offset(RC6700, 0.000025)
-    buffer_L, buffer_R = get_ROW_offset(RC6700, 0.00005)
-
-
-    pm_main = KML.Placemark(
-        KML.name('main'),
-        KML.Style(
-            KML.LineStyle(
-                KML.color(GREEN),
-                KML.width('4')
-            )
-        ),
-        KML.extrude(0),
-        KML.MultiGeometry(
-            KML.LineString(
-                KML.coordinates(raw_RC6700)
-            )
-        ),
-        id='000'
-    )
-
-    pm_ROW = KML.Placemark(
-        KML.name('ROW'),
-        KML.Style(
-            KML.LineStyle(
-                KML.color(BLUE),
-                KML.width('4')
-            )
-        ),
-        KML.extrude(0),
-        KML.MultiGeometry(
-            KML.LineString(
-                KML.coordinates(ROW_R)
-            ),
-            KML.LineString(
-                KML.coordinates(ROW_L)
-            )
-        ),
-        id='001'
-    )
-
-
-    pm_buffer = KML.Placemark(
-        KML.name('Buffer'),
-        KML.Style(
-            KML.LineStyle(
-                KML.color(RED),
-                KML.width('4')
-            )
-        ),
-        KML.extrude(0),
-        KML.MultiGeometry(
-            KML.LineString(
-                KML.coordinates(buffer_R)
-            ),
-            KML.LineString(
-                KML.coordinates(buffer_L)
-            )
-        ),
-        id='002'
-    )
-
-    with open('./processed_data/RC6700_ICS.kml', 'w') as f:
+    with open('./processed_data/route_ICS.kml', 'w') as f:
         doc = KML.kml(
             KML.Document(
                 KML.name('ICS Modified'),
-                KML.Folder(
-                    KML.name('RC6700'),
-                    pm_main,
-                    pm_ROW,
-                    pm_buffer
-                )
+                route_folder_generator(root, 'RC6700', 0.000025, 0.00005),
+                route_folder_generator(root, 'RC6800', 0.000025, 0.00005),
+                route_folder_generator(root, 'RC0690', 0.00004, 0.00005),
+                route_folder_generator(root, 'RC0660', 0.00004, 0.00005),
+                route_folder_generator(root, 'RC063601', 0.00002, 0.00005),
+                route_folder_generator(root, 'RC0664', 0.00004, 0.00005),
+                route_folder_generator(root, 'RC0400', 0.00010, 0.00005),
+                route_folder_generator(root, 'RC0460', 0.00011, 0.00005),
+                route_folder_generator(root, 'RC5600', 0.00010, 0.00005),
+                route_folder_generator(root, 'RC0430', 0.000025, 0.00005),
+                route_folder_generator(root, 'RC4900', 0.00010, 0.00005),
+                route_folder_generator(root, 'RC5610', 0.000025, 0.00005),
             )
         )
         f.write(etree.tostring(doc, pretty_print=True))
