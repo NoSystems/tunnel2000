@@ -6,18 +6,26 @@ from os import path
 from zipfile import ZipFile
 from lxml import etree
 
+
+# AABBGGRR
 RED = 'ff0000ff'
 GREEN = 'ff00ff00'
 BLUE = 'ffff0000'
 
 
 def unzip_kmz(kml_file):
+    """
+        Use for unzip .kmz to .kml
+    """
     kmz = ZipFile(kml_file)
     kml = kmz.open('doc.kml', 'r').read()
     return kml
 
 
 def get_node(node_name, child_name, root):
+    """
+        Get node from .kml file by node name and child name 
+    """
     opengis = '{http://www.opengis.net/kml/2.2}'
     for child in root.iter():
         if child.tag == ''.join([opengis, node_name]):
@@ -43,18 +51,21 @@ def get_coordinate(folder_name, placemark_name, root):
     return coor_placemark, raw_coor
 
 
-def to_ROW_string(coordinates):
-    ROW = ''
+def to_offset_string(coordinates):
+    """
+        convert floating point coordinates to string
+    """
+    offset = ''
     for p in coordinates:
-        ROW = ROW + ','.join([str(x) for x in p]) + ' '
-    return ROW
+        offset = offset + ','.join([str(x) for x in p]) + ' '
+    return offset
 
 
-def get_ROW_offset(coordinates, offset):
+def get_offset(coordinates, offset):
     """
         offset, 0.00005 = 5m
     """
-    ROW_L, ROW_R = [], []
+    offset_L, offset_R = [], []
     for coor in coordinates:
         coor_lla = coor.split(',')
         if not coor_lla:
@@ -63,20 +74,21 @@ def get_ROW_offset(coordinates, offset):
             coor_lla = np.array(coor_lla).astype(np.float64)
             temp_l = coor_lla[0] + offset
             temp_r = coor_lla[0] - offset
-            ROW_L.append([temp_l, coor_lla[1], 0])
-            ROW_R.append([temp_r, coor_lla[1], 0])
+            offset_L.append([temp_l, coor_lla[1], 0])
+            offset_R.append([temp_r, coor_lla[1], 0])
         except ValueError:
             continue 
 
-    ROW_L = np.array(ROW_L).astype(np.str)
-    ROW_R = np.array(ROW_R).astype(np.str)
+    offset_L = np.array(offset_L).astype(np.str)
+    offset_R = np.array(offset_R).astype(np.str)
 
-    return to_ROW_string(ROW_L), to_ROW_string(ROW_R)
+    return to_offset_string(offset_L), to_offset_string(offset_R)
 
 
 def placemark_generator(placemark_id, placemark_name, line_color, line_width, coordinates):
     """
         All parameter should be a string, except coordinates is a list of strings
+        return Placemark with KML structure
     """
     if placemark_name == 'main':
         multi_geometry = KML.MultiGeometry(KML.LineString(KML.coordinates(coordinates)))
@@ -104,9 +116,12 @@ def placemark_generator(placemark_id, placemark_name, line_color, line_width, co
 
 
 def route_folder_generator(root, placemark_name, ROW_offset, buffer_offset):
+    """
+        Generating Folder KML with Placemark main, ROW, and buffer inside
+    """
     route, raw_route = get_coordinate('MainPipeline', placemark_name, root)
-    ROW_L, ROW_R = get_ROW_offset(route, ROW_offset)
-    buffer_L, buffer_R = get_ROW_offset(route, buffer_offset)
+    ROW_L, ROW_R = get_offset(route, ROW_offset)
+    buffer_L, buffer_R = get_offset(route, buffer_offset)
     pm_main = placemark_generator('000', 'main', GREEN, 4, raw_route)
     pm_ROW = placemark_generator('001', 'ROW', BLUE, 4, [ROW_L, ROW_R])
     pm_buffer = placemark_generator('002', 'buffer', RED, 4, [buffer_L, buffer_R])
@@ -118,10 +133,6 @@ def route_folder_generator(root, placemark_name, ROW_offset, buffer_offset):
     )
 
     return folder_kml
-
-
-        
-
 
 
 if __name__ == '__main__':
